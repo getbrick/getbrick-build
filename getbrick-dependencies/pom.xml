@@ -14,216 +14,257 @@
     <packaging>pom</packaging>
 
     <name>Getbrick Dependencies</name>
-    <description>Getbrick Dependencies BOM - a curated, reproducible set of third-party versions for every Getbrick module</description>
+    <description>Getbrick BOM - a curated, reproducible dependency set for Getbrick projects. Imports spring-boot-dependencies
+        and adds only what Spring Boot does not manage.</description>
+
+    <!--
+      编排规则（评审后写死）：
+
+      1. Spring Boot 能管的一律不管。本 BOM 不重复声明 Spring Framework、Jackson、JUnit、
+         Hibernate Validator、Testcontainers、Logback、SLF4J、Micrometer、Caffeine，
+         也不重复声明 commons-lang3 / commons-codec / commons-pool2 / commons-dbcp2。
+         重复声明等于和 Boot BOM 打架，且会产生一份不受安全更新覆盖的影子版本。
+
+      2. 顺序即优先级。多个 <scope>import</scope> 之间，后 import 的覆盖先 import 的同键条目；
+         而本 POM <dependencyManagement> 里直接声明的条目，永远优先于所有 import 进来的。
+         依赖 Aether 实现细节，不要把它当 API 契约用——所以重叠项一律走「直接声明」。
+
+      3. 无 version 的 dependencyManagement 条目会覆盖导入 BOM 里的同键条目，导致
+         "'dependencies.dependency.version' is missing"。所以从别的 BOM import 进来的制品
+         （junit-*、testcontainers-*、jackson-*、netty-*）在此一律不重复声明。
+
+      4. dependencyManagement 覆盖不了 dependencyConvergence。MyBatis-Plus 3.5.17 与
+         dynamic-datasource 4.5.0 的传递依赖版本不一致（spring-aop、mybatis-spring 等），
+         收敛只能靠 <exclusion>。用 -Pstrict 看清冲突来源。
+    -->
 
     <properties>
-        <!-- ==================== Logging ==================== -->
-        <slf4j.version>2.0.20</slf4j.version>
-        <logback.version>1.5.38</logback.version>
-        <log4j2.version>2.26.1</log4j2.version>
-        <jul-to-slf4j.version>2.0.20</jul-to-slf4j.version>
+        <!-- ==================== 由 Spring Boot 接管，此处不声明 ==================== -->
+        <!-- spring-framework 7.0.9 | jackson 3.x (tools.jackson) | junit-jupiter 6.x       -->
+        <!-- hibernate-validator 9.x | testcontainers 2.x | logback 1.5.x | slf4j 2.0.x      -->
+        <!-- micrometer 1.17.x | caffeine 3.2.x | commons-lang3 / codec / pool2 / dbcp2     -->
 
-        <!-- ==================== Test ==================== -->
-        <junit-jupiter.version>5.14.4</junit-jupiter.version>
-        <mockito.version>5.24.0</mockito.version>
-        <assertj.version>3.27.7</assertj.version>
-        <awaitility.version>4.3.0</awaitility.version>
-        <testcontainers.version>2.0.5</testcontainers.version>
-        <wiremock.version>3.13.1</wiremock.version>
+        <!-- ==================== Spring Boot 基线 ==================== -->
+        <!--
+          注意：MyBatis-Plus 3.5.17 的编译基线是 Spring Boot 4.0.1，不是 4.1.x。
+          Boot 4.1 与 4.0 在自动装配 API 上兼容，但升级 Boot 时必须重跑
+          getbrick-mybatis-plus 的 Testcontainers 集成测试。
+        -->
+        <spring-boot.version>4.1.1</spring-boot.version>
 
-        <!-- ==================== Serialization ==================== -->
-        <jackson.version>2.22.3</jackson.version>
+        <!-- ==================== 持久层 ==================== -->
+        <mybatis-plus.version>3.5.17</mybatis-plus.version>
+        <dynamic-datasource.version>4.5.0</dynamic-datasource.version>
+        <mybatis.version>3.5.19</mybatis.version>
+        <mybatis-spring.version>4.1.0</mybatis-spring.version>
+        <!--
+          MyBatis-Plus 3.5.x 把 JSQLParser 支持拆成 mybatis-plus-jsqlparser-4.9 和
+          mybatis-plus-jsqlparser-5.0 两个模块，两者都含 TenantLineInnerInterceptor /
+          DataPermissionInterceptor / PaginationInnerInterceptor。同时引入会被
+          banDuplicateClasses 打爆。Getbrick 选 5.0 那套。
+        -->
+        <mybatis-plus-jsqlparser.version>5.0</mybatis-plus-jsqlparser.version>
+        <jsqlparser.version>5.4</jsqlparser.version>
+        <mysql-connector.version>26.7.0</mysql-connector.version>
+        <postgresql.version>42.7.13</postgresql.version>
 
-        <!-- ==================== Networking ==================== -->
-        <netty.version>4.2.18.Final</netty.version>
+        <!-- ==================== 弹性与缓存 ==================== -->
+        <!-- resilience4j-bom 只含 spring6 / spring-boot3 模块，Boot 4 的模块必须单独声明 -->
+        <resilience4j.version>2.4.0</resilience4j.version>
+        <redisson.version>4.7.0</redisson.version>
+        <!-- Redisson 4.7.0 的编译基线是 Spring Framework 6.2，跑在 7.x 上属跨大版本，需集成测试覆盖 -->
+        <redisson.spring.version>6.2.11</redisson.spring.version>
 
-        <!-- ==================== Caching / collections ==================== -->
-        <caffeine.version>3.3.0</caffeine.version>
-        <guava.version>33.7.1-jre</guava.version>
-        <commons-lang3.version>3.20.0</commons-lang3.version>
+        <!-- ==================== API 文档 ==================== -->
+        <springdoc.version>3.1.1</springdoc.version>
+
+        <!-- ==================== Apache Commons（Boot 已管 lang3/codec/pool2/dbcp2） ==================== -->
         <commons-io.version>2.22.0</commons-io.version>
-        <classgraph.version>4.8.196</classgraph.version>
+        <commons-text.version>1.15.0</commons-text.version>
+        <commons-collections4.version>4.6.0</commons-collections4.version>
+        <commons-math3.version>3.6.1</commons-math3.version>
+        <commons-compress.version>1.28.0</commons-compress.version>
+        <commons-csv.version>1.14.1</commons-csv.version>
 
-        <!-- ==================== Code generation ==================== -->
-        <lombok.version>1.18.48</lombok.version>
+        <!-- ==================== ID 与相等性 ==================== -->
+        <java-uuid-generator.version>5.2.0</java-uuid-generator.version>
+        <equalsverifier.version>4.5.2</equalsverifier.version>
+
+        <!-- ==================== 代码生成 ==================== -->
         <mapstruct.version>1.6.3</mapstruct.version>
+        <lombok.version>1.18.48</lombok.version>
 
-        <!-- ==================== Static analysis annotations ==================== -->
+        <!-- ==================== 分层约束测试 ==================== -->
+        <!-- Boot 4 用 JUnit 6，必须引 archunit-junit6，引 -junit5 会静默不执行 -->
+        <archunit.version>1.5.1</archunit.version>
+
+        <!-- ==================== 其他 ==================== -->
+        <transmittable-thread-local.version>2.14.5</transmittable-thread-local.version>
         <jspecify.version>1.0.1</jspecify.version>
-        <checker-qual.version>4.2.3</checker-qual.version>
-        <error-prone-annotations.version>2.50.0</error-prone-annotations.version>
-        <jetbrains-annotations.version>26.1.0</jetbrains-annotations.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
-            <!-- ==================== Imported BOMs ==================== -->
+            <!-- ==================== ① 生态基线，放最前 ==================== -->
             <dependency>
-                <groupId>org.junit</groupId>
-                <artifactId>junit-bom</artifactId>
-                <version>${junit-jupiter.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>com.fasterxml.jackson</groupId>
-                <artifactId>jackson-bom</artifactId>
-                <version>${jackson.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>io.netty</groupId>
-                <artifactId>netty-bom</artifactId>
-                <version>${netty.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.testcontainers</groupId>
-                <artifactId>testcontainers-bom</artifactId>
-                <version>${testcontainers.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.logging.log4j</groupId>
-                <artifactId>log4j-bom</artifactId>
-                <version>${log4j2.version}</version>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
 
-            <!-- ==================== Logging ==================== -->
+            <!-- ==================== ② Spring Boot 不管的 BOM ==================== -->
             <dependency>
-                <groupId>org.slf4j</groupId>
-                <artifactId>slf4j-api</artifactId>
-                <version>${slf4j.version}</version>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-bom</artifactId>
+                <version>${mybatis-plus.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
             <dependency>
-                <groupId>org.slf4j</groupId>
-                <artifactId>jul-to-slf4j</artifactId>
-                <version>${jul-to-slf4j.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>ch.qos.logback</groupId>
-                <artifactId>logback-classic</artifactId>
-                <version>${logback.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>ch.qos.logback</groupId>
-                <artifactId>logback-core</artifactId>
-                <version>${logback.version}</version>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-bom</artifactId>
+                <version>${resilience4j.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
 
-            <!-- ==================== Test ==================== -->
+            <!-- ==================== ③ 覆盖层：直接声明的条目优先级最高 ==================== -->
+
+            <!-- Boot BOM 和 MP BOM 都不管 org.mybatis，MP core 3.5.17 要 mybatis 3.5.19 -->
+            <dependency>
+                <groupId>org.mybatis</groupId>
+                <artifactId>mybatis</artifactId>
+                <version>${mybatis.version}</version>
+            </dependency>
             <!--
-              junit-* and testcontainers-* are deliberately NOT repeated here. A versionless
-              dependencyManagement entry would override the identical entry coming from the
-              imported junit-bom / testcontainers-bom, and the result fails validation with
-              "dependencies.dependency.version ... is missing". Declare them at the usage site.
+              dynamic-datasource 4.5.0 会拖进 mybatis-spring 2.1.2（Boot 2 时代），
+              与 MP 3.5.17 要求的 4.x 冲突。getbrick-mybatis-plus 里用 <exclusion> 排掉。
             -->
             <dependency>
-                <groupId>org.mockito</groupId>
-                <artifactId>mockito-core</artifactId>
-                <version>${mockito.version}</version>
-                <scope>test</scope>
+                <groupId>org.mybatis</groupId>
+                <artifactId>mybatis-spring</artifactId>
+                <version>${mybatis-spring.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.mockito</groupId>
-                <artifactId>mockito-junit-jupiter</artifactId>
-                <version>${mockito.version}</version>
-                <scope>test</scope>
+                <groupId>com.github.jsqlparser</groupId>
+                <artifactId>jsqlparser</artifactId>
+                <version>${jsqlparser.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.assertj</groupId>
-                <artifactId>assertj-core</artifactId>
-                <version>${assertj.version}</version>
-                <scope>test</scope>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-jsqlparser</artifactId>
+                <version>${mybatis-plus-jsqlparser.version}</version>
             </dependency>
+            <!-- resilience4j-bom 2.4.0 里没有这个模块 -->
             <dependency>
-                <groupId>org.awaitility</groupId>
-                <artifactId>awaitility</artifactId>
-                <version>${awaitility.version}</version>
-                <scope>test</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.wiremock</groupId>
-                <artifactId>wiremock-standalone</artifactId>
-                <version>${wiremock.version}</version>
-                <scope>test</scope>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-spring-boot4</artifactId>
+                <version>${resilience4j.version}</version>
             </dependency>
 
-            <!-- ==================== Caching / collections ==================== -->
             <dependency>
-                <groupId>com.github.ben-manes.caffeine</groupId>
-                <artifactId>caffeine</artifactId>
-                <version>${caffeine.version}</version>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.google.guava</groupId>
-                <artifactId>guava</artifactId>
-                <version>${guava.version}</version>
+                <groupId>org.redisson</groupId>
+                <artifactId>redisson</artifactId>
+                <version>${redisson.version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>dynamic-datasource-spring-boot4-starter</artifactId>
+                <version>${dynamic-datasource.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.mysql</groupId>
+                <artifactId>mysql-connector-j</artifactId>
+                <version>${mysql-connector.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.postgresql</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>${postgresql.version}</version>
+            </dependency>
+
             <dependency>
                 <groupId>org.apache.commons</groupId>
-                <artifactId>commons-lang3</artifactId>
-                <version>${commons-lang3.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>commons-io</groupId>
                 <artifactId>commons-io</artifactId>
                 <version>${commons-io.version}</version>
             </dependency>
             <dependency>
-                <groupId>io.github.classgraph</groupId>
-                <artifactId>classgraph</artifactId>
-                <version>${classgraph.version}</version>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-text</artifactId>
+                <version>${commons-text.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-collections4</artifactId>
+                <version>${commons-collections4.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-math3</artifactId>
+                <version>${commons-math3.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-compress</artifactId>
+                <version>${commons-compress.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-csv</artifactId>
+                <version>${commons-csv.version}</version>
             </dependency>
 
-            <!-- ==================== Code generation ==================== -->
             <dependency>
-                <groupId>org.projectlombok</groupId>
-                <artifactId>lombok</artifactId>
-                <version>${lombok.version}</version>
-                <scope>provided</scope>
+                <groupId>com.fasterxml.uuid</groupId>
+                <artifactId>java-uuid-generator</artifactId>
+                <version>${java-uuid-generator.version}</version>
             </dependency>
+            <dependency>
+                <groupId>nl.jqno.equalsverifier</groupId>
+                <artifactId>equalsverifier</artifactId>
+                <version>${equalsverifier.version}</version>
+                <scope>test</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>com.tngtech.archunit</groupId>
+                <artifactId>archunit</artifactId>
+                <version>${archunit.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.tngtech.archunit</groupId>
+                <artifactId>archunit-junit6</artifactId>
+                <version>${archunit.version}</version>
+            </dependency>
+
             <dependency>
                 <groupId>org.mapstruct</groupId>
                 <artifactId>mapstruct</artifactId>
                 <version>${mapstruct.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.mapstruct</groupId>
-                <artifactId>mapstruct-processor</artifactId>
-                <version>${mapstruct.version}</version>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
                 <scope>provided</scope>
             </dependency>
 
-            <!-- ==================== Static analysis annotations ==================== -->
+            <dependency>
+                <groupId>com.alibaba</groupId>
+                <artifactId>transmittable-thread-local</artifactId>
+                <version>${transmittable-thread-local.version}</version>
+            </dependency>
             <dependency>
                 <groupId>org.jspecify</groupId>
                 <artifactId>jspecify</artifactId>
                 <version>${jspecify.version}</version>
-                <scope>provided</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.checkerframework</groupId>
-                <artifactId>checker-qual</artifactId>
-                <version>${checker-qual.version}</version>
-                <scope>provided</scope>
-            </dependency>
-            <dependency>
-                <groupId>com.google.errorprone</groupId>
-                <artifactId>error_prone_annotations</artifactId>
-                <version>${error-prone-annotations.version}</version>
-                <scope>provided</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.jetbrains</groupId>
-                <artifactId>annotations</artifactId>
-                <version>${jetbrains-annotations.version}</version>
-                <scope>provided</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>
