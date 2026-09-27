@@ -1,0 +1,10 @@
+# Default owners for everything in this repository.
+* @getbrick/infra
+
+# The BOM is the most sensitive file in the repo: a wrong version reaches every module.
+getbrick-dependencies/ @getbrick/infra @getbrick/arch
+
+# Build and release pipeline.
+.github/workflows/ @getbrick/infra
+config/ @getbrick/infra
+pom.xml @getbrick/infra @getbrick/arch
