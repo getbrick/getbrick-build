@@ -121,13 +121,6 @@
         <central.publishing.server.id>central</central.publishing.server.id>
         <github.publishing.server.id>github</github.publishing.server.id>
 
-        <!--
-          This repository publishes the parent POM and the BOM. Both are pom packaging with no
-          build-time placeholders, and consumers need the full <properties> and <build> from the
-          parent, so they are installed verbatim. Downstream library modules inherit the flatten
-          execution and get a resolved .flattened-pom.xml.
-        -->
-        <flatten.skip>true</flatten.skip>
     </properties>
 
     <repositories>
@@ -308,7 +301,7 @@
                         <autoVersionSubmodules>true</autoVersionSubmodules>
                         <pushChanges>true</pushChanges>
                         <localCheckout>true</localCheckout>
-                        <preparationGoals>clean verify -Dflatten.skip=true</preparationGoals>
+                        <preparationGoals>clean verify</preparationGoals>
                         <arguments>-DskipTests -Dmaven.javadoc.skip=true</arguments>
                     </configuration>
                 </plugin>
@@ -362,6 +355,19 @@
                     <version>${build-helper-maven-plugin.version}</version>
                 </plugin>
                 <plugin>
+                    <!--
+                      按需启用，不要绑到 <build><plugins>。本仓库自身发布的就是父 POM 和 BOM，
+                      flatten 会把 <properties> 和 <build> 从发布出去的 POM 里剥掉，下游随即
+                      拿到一份残废的父 POM。反过来，若用 <flatten.skip> 属性来豁免本仓库，
+                      该属性又会被所有下游继承，等于把 flatten 全网关掉——而本项目没有
+                      ${revision} 这类 CI-friendly 版本，flatten 并没有必须开启的理由。
+                      真要用（仓库决定采用 ${revision} 驱动版本）时在自己的 pom 里加：
+                        <plugin><groupId>org.codehaus.mojo</groupId>
+                        <artifactId>flatten-maven-plugin</artifactId>
+                        <executions><execution><id>flatten</id>
+                        <phase>process-resources</phase><goals><goal>flatten</goal></goals>
+                        </execution></executions></plugin>
+                    -->
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>flatten-maven-plugin</artifactId>
                     <version>${flatten-maven-plugin.version}</version>
@@ -375,6 +381,22 @@
                         <updatePomFile>true</updatePomFile>
                         <flattenMode>ossrh</flattenMode>
                     </configuration>
+                    <executions>
+                        <execution>
+                            <id>flatten</id>
+                            <goals>
+                                <goal>flatten</goal>
+                            </goals>
+                            <phase>process-resources</phase>
+                        </execution>
+                        <execution>
+                            <id>flatten.clean</id>
+                            <goals>
+                                <goal>clean</goal>
+                            </goals>
+                            <phase>clean</phase>
+                        </execution>
+                    </executions>
                 </plugin>
                 <plugin>
                     <groupId>com.diffplug.spotless</groupId>
@@ -452,25 +474,18 @@
         </pluginManagement>
 
         <plugins>
+            <!--
+              这两个必须真的绑定，不能只写在 pluginManagement：<pluginManagement> 中的
+              <executions> 只有在 <build><plugins> 也声明了该插件时才生效。
+              缺了 -sources.jar / -javadoc.jar 附件，Central Portal 会直接拒绝发布。
+            -->
             <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>flatten-maven-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>flatten</id>
-                        <goals>
-                            <goal>flatten</goal>
-                        </goals>
-                        <phase>process-resources</phase>
-                    </execution>
-                    <execution>
-                        <id>flatten.clean</id>
-                        <goals>
-                            <goal>clean</goal>
-                        </goals>
-                        <phase>clean</phase>
-                    </execution>
-                </executions>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
             </plugin>
 
             <plugin>
@@ -500,7 +515,6 @@
                                     <version>[${maven.min.version},)</version>
                                 </requireMavenVersion>
                                 <banDuplicatePomDependencyVersions />
-                                <dependencyConvergence />
                             </rules>
                         </configuration>
                     </execution>
@@ -702,6 +716,14 @@
                                 <configuration>
                                     <rules>
                                         <requireUpperBoundDeps />
+                                        <dependencyConvergence />
+                                        <!--
+                                      已知冲突：MyBatis-Plus 3.5.17 与 dynamic-datasource 4.5.0
+                                      的传递依赖版本不一致（spring-aop 7.0.2 vs 5.3.20、
+                                      mybatis-spring 4.0.0 vs 2.1.2）。收敛只能靠 <exclusion>，
+                                      dependencyManagement 覆盖不生效。
+                                      新增依赖后先跑 -Pstrict 看清冲突来源。
+                                    -->
                                     </rules>
                                 </configuration>
                             </execution>

@@ -1,7 +1,6 @@
 version: 2
 updates:
   - package-ecosystem: maven
-    enabled: false
     directory: /
     schedule:
       interval: weekly
@@ -23,20 +22,7 @@ updates:
         exclude-patterns: []
         update-types: ['patch']
 
-  - package-ecosystem: maven
-    enabled: false
-    directory: /getbrick-dependencies
-    schedule:
-      interval: weekly
-      day: monday
-      time: '04:00'
-      timezone: Asia/Shanghai
-    open-pull-requests-limit: 10
-    commit-message:
-      prefix: 'chore(deps)'
-
   - package-ecosystem: github-actions
-    enabled: false
     directory: /
     schedule:
       interval: weekly
@@ -46,9 +32,3 @@ updates:
     commit-message:
       prefix: 'ci'
 
-  - package-ecosystem: docker
-    enabled: false
-    directory: /
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 0
